@@ -34,6 +34,87 @@
                      &trans &trans &trans
 
 / {
+    // User-defined behaviors (extends behaviors.dtsi). Studio renders
+    // tap-dance entries under its Dynamic ▸ Tap Dance tab.
+    behaviors {
+        // Cycles X → Y → Z by tap count. tapping-term-ms is the
+        // window in which a follow-up tap is treated as part of the
+        // same dance instead of triggering the previous index.
+        td_xyz: td_xyz {
+            compatible = "zmk,behavior-tap-dance";
+            #binding-cells = <0>;
+            tapping-term-ms = <250>;
+            bindings = <&kp X>, <&kp Y>, <&kp Z>;
+        };
+    };
+
+    // Combos — fire a binding when listed key positions go down inside
+    // timeout-ms of each other. Studio surfaces these under its Dynamic
+    // ▸ Combos tab. Without a `layers` property a combo is global.
+    combos {
+        compatible = "zmk,combos";
+
+        // BTN1 + BTN2 chord on the onboard buttons → ESC. Tight 40 ms
+        // window so accidental near-simultaneous presses don't trip it.
+        combo_esc {
+            timeout-ms = <40>;
+            key-positions = <0 1>;
+            bindings = <&kp ESC>;
+        };
+
+        // Matrix top-left two keys (positions 4 + 5) → TAB. Different
+        // window/positions to exercise multiple combo entries.
+        combo_tab {
+            timeout-ms = <40>;
+            key-positions = <4 5>;
+            bindings = <&kp TAB>;
+        };
+    };
+
+    // Macros under test. Three flavors cover the bulk of the ZMK macro
+    // surface: zero-param tap sequence with timing overrides, manual
+    // modifier press/release wrapping a tap burst, and a parametrized
+    // (one-param) macro using &macro_param_1to1.
+    macros {
+        // Plain tap sequence — types "hello". Overrides default macro
+        // timing so each tap holds 30 ms with a 30 ms gap; useful for
+        // hosts that drop frames at ZMK's default 100 Hz cadence.
+        m_hello: m_hello {
+            compatible = "zmk,behavior-macro";
+            #binding-cells = <0>;
+            wait-ms = <30>;
+            tap-ms = <30>;
+            bindings = <&kp H &kp E &kp L &kp L &kp O>;
+        };
+
+        // Modifier-hold around a tap burst — types "ABC" by holding
+        // LSHIFT across three letter taps, then releasing. Exercises
+        // &macro_press / &macro_release instead of relying on &kp.
+        m_shifted: m_shifted {
+            compatible = "zmk,behavior-macro";
+            #binding-cells = <0>;
+            bindings
+                = <&macro_press &kp LSHFT>
+                , <&macro_tap &kp A &kp B &kp C>
+                , <&macro_release &kp LSHFT>
+                ;
+        };
+
+        // One-param macro — forwards its argument into the inner &kp via
+        // &macro_param_1to1. Bound as `&m_param C` below for Ctrl+C, but
+        // any keycode works as the param.
+        m_param: m_param {
+            compatible = "zmk,behavior-macro-one-param";
+            #binding-cells = <1>;
+            bindings
+                = <&macro_press &kp LCTRL>
+                , <&macro_tap &macro_param_1to1>
+                , <&macro_pause_for_release>
+                , <&macro_release &kp LCTRL>
+                ;
+        };
+    };
+
     keymap {
         compatible = "zmk,keymap";
 
@@ -105,7 +186,23 @@
         // ─── L8 system reset / bootloader / soft-off ───
         l8_system {
             bindings = <
-                &sys_reset &bootloader &soft_off &to 0
+                &sys_reset &bootloader &soft_off &to 9
+                MATRIX_TRANS
+            >;
+        };
+
+        // ─── L9 macros — tap sequence / mod-wrapped burst / parametrized ───
+        l9_macros {
+            bindings = <
+                &m_hello &m_shifted &m_param C &to 10
+                MATRIX_TRANS
+            >;
+        };
+
+        // ─── L10 tap-dance — single/double/triple tap cycles X/Y/Z ───
+        l10_tapdance {
+            bindings = <
+                &td_xyz &none &none &to 0
                 MATRIX_TRANS
             >;
         };
