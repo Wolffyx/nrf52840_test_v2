@@ -10,6 +10,10 @@
 		zmk,backlight = &backlight_pwm;
 		zmk,underglow = &led_strip;
 		zmk,ext-power = &ext_power_ctrl;
+		// CDC ACM endpoint that ZMK Studio's RPC transport binds to.
+		// Without this, the firmware exposes only the HID keyboard
+		// interface and Windows never enumerates a COM port for Studio.
+		zmk,studio-rpc-uart = &studio_acm;
 	};
 
 	// Stub ext-power "switch" pinned to LED2 (P0.14). The DK has no
@@ -172,6 +176,17 @@
 	pinctrl-0 = <&pwm0_default>;
 	pinctrl-1 = <&pwm0_sleep>;
 	pinctrl-names = "default", "sleep";
+};
+
+// CDC ACM USB function for ZMK Studio RPC transport. Lives on the
+// nRF USB device controller (J3 connector). The chosen `zmk,studio-rpc-uart`
+// above wires Studio's UART RPC layer to this endpoint, which the host
+// PC sees as a generic USB serial port (Windows: "USB Serial Device"
+// under Ports (COM & LPT)).
+&zephyr_udc0 {
+	studio_acm: studio_acm {
+		compatible = "zephyr,cdc-acm-uart";
+	};
 };
 
 &spi3 {
