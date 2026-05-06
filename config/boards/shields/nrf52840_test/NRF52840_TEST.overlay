@@ -9,6 +9,18 @@
 		zmk,physical-layout = &physical_layout_default;
 		zmk,backlight = &backlight_pwm;
 		zmk,underglow = &led_strip;
+		zmk,ext-power = &ext_power;
+	};
+
+	// Stub ext-power "switch" pinned to LED2 (P0.14). The DK has no
+	// real peripheral power gate; this lets ZMK's RGB driver resolve
+	// its hard ext_power dependency at build time, and lets the
+	// &ext_power EP_TOG / EP_ON / EP_OFF behaviors visibly toggle a
+	// LED so you can see them firing.
+	ext_power: ext_power {
+		compatible = "zmk,ext-power-generic";
+		control-gpios = <&gpio0 14 GPIO_ACTIVE_LOW>;
+		init-delay-ms = <10>;
 	};
 
 	// Physical layout — 16 keys in two clusters:
