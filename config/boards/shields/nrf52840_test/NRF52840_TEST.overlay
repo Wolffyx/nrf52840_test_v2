@@ -9,7 +9,7 @@
 		zmk,physical-layout = &physical_layout_default;
 		zmk,backlight = &backlight_pwm;
 		zmk,underglow = &led_strip;
-		zmk,ext-power = &ext_power;
+		zmk,ext-power = &ext_power_ctrl;
 	};
 
 	// Stub ext-power "switch" pinned to LED2 (P0.14). The DK has no
@@ -17,7 +17,10 @@
 	// its hard ext_power dependency at build time, and lets the
 	// &ext_power EP_TOG / EP_ON / EP_OFF behaviors visibly toggle a
 	// LED so you can see them firing.
-	ext_power: ext_power {
+	// Label is `ext_power_ctrl` (not `ext_power`) because ZMK's
+	// behaviors.dtsi already labels its &ext_power *behavior* node
+	// with the bare `ext_power` symbol.
+	ext_power_ctrl: ext_power_ctrl {
 		compatible = "zmk,ext-power-generic";
 		control-gpios = <&gpio0 14 GPIO_ACTIVE_LOW>;
 		init-delay-ms = <10>;
