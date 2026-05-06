@@ -1,41 +1,94 @@
-#include <dt-bindings/zmk/matrix_transform.h>
+#include <zephyr/dt-bindings/led/led.h>
 
 / {
 	chosen {
 		zmk,kscan = &kscan;
-		zmk,matrix_transform = &transform;
+		zmk,backlight = &backlight_pwm;
+		zmk,underglow = &led_strip;
 	};
 
-	transform: transform {
-		compatible = "zmk,matrix-transform";
-		columns = <3>;
-		rows = <4>;
-		map = <
-			RC(0, 0) RC(0, 1) RC(0, 2)
-			RC(1, 0) RC(1, 1) RC(1, 2)
-			RC(2, 0) RC(2, 1) RC(2, 2)
-			RC(3, 0) RC(3, 1) RC(3, 2)
-		>;
-	};
-
-	// nrf52840-DK Arduino-header pins. Avoids onboard LEDs (P0.13-16) and
-	// buttons (P0.11/12/24/25). Wire row pins to one side of each switch,
-	// col pins to the other side; diodes point col→row (col2row).
-	//   Rows: D2=P1.03, D3=P1.04, D4=P1.05, D5=P1.06
-	//   Cols: D6=P1.07, D7=P1.08, D8=P1.10
+	// Direct-pin kscan on the four onboard nrf52840-DK buttons.
+	// Buttons are active-low (one side wired to GND, the other to the
+	// SoC pin) so we use ACTIVE_LOW + an internal pull-up.
+	//   BTN1 = P0.11   BTN2 = P0.12
+	//   BTN3 = P0.24   BTN4 = P0.25
+	// Position order in the keymap matches the input-gpios order below.
 	kscan: kscan {
-		compatible = "zmk,kscan-gpio-matrix";
-		diode-direction = "col2row";
-		row-gpios
-			= <&gpio1 3 (GPIO_ACTIVE_HIGH | GPIO_PULL_DOWN)>
-			, <&gpio1 4 (GPIO_ACTIVE_HIGH | GPIO_PULL_DOWN)>
-			, <&gpio1 5 (GPIO_ACTIVE_HIGH | GPIO_PULL_DOWN)>
-			, <&gpio1 6 (GPIO_ACTIVE_HIGH | GPIO_PULL_DOWN)>
+		compatible = "zmk,kscan-gpio-direct";
+		input-gpios
+			= <&gpio0 11 (GPIO_ACTIVE_LOW | GPIO_PULL_UP)>
+			, <&gpio0 12 (GPIO_ACTIVE_LOW | GPIO_PULL_UP)>
+			, <&gpio0 24 (GPIO_ACTIVE_LOW | GPIO_PULL_UP)>
+			, <&gpio0 25 (GPIO_ACTIVE_LOW | GPIO_PULL_UP)>
 			;
-		col-gpios
-			= <&gpio1 7 GPIO_ACTIVE_HIGH>
-			, <&gpio1 8 GPIO_ACTIVE_HIGH>
-			, <&gpio1 10 GPIO_ACTIVE_HIGH>
-			;
+	};
+
+	// Backlight = onboard LED1 (P0.13) driven through PWM0 channel 0.
+	// LED is active-low (anode tied to VDD), so polarity is inverted —
+	// "0%" duty leaves it off, "100%" sinks current and lights it.
+	backlight_pwm: backlight_pwm {
+		compatible = "pwm-leds";
+		bl_led_0: bl_led_0 {
+			pwms = <&pwm0 0 PWM_MSEC(10) PWM_POLARITY_INVERTED>;
+		};
+	};
+};
+
+// PWM0 → LED1 on P0.13. Override the board's default pwm0 pinctrl so
+// channel 0 lands on the LED, leaving channels 1–3 unused.
+&pinctrl {
+	pwm0_default: pwm0_default {
+		group1 {
+			psels = <NRF_PSEL(PWM_OUT0, 0, 13)>;
+		};
+	};
+	pwm0_sleep: pwm0_sleep {
+		group1 {
+			psels = <NRF_PSEL(PWM_OUT0, 0, 13)>;
+			low-power-enable;
+		};
+	};
+
+	// SPI3 MOSI → P1.13 (Arduino D11). MISO/SCK unused — WS2812 only
+	// needs the data line.
+	spi3_default: spi3_default {
+		group1 {
+			psels = <NRF_PSEL(SPIM_MOSI, 1, 13)>;
+		};
+	};
+	spi3_sleep: spi3_sleep {
+		group1 {
+			psels = <NRF_PSEL(SPIM_MOSI, 1, 13)>;
+			low-power-enable;
+		};
+	};
+};
+
+&pwm0 {
+	status = "okay";
+	pinctrl-0 = <&pwm0_default>;
+	pinctrl-1 = <&pwm0_sleep>;
+	pinctrl-names = "default", "sleep";
+};
+
+&spi3 {
+	compatible = "nordic,nrf-spim";
+	status = "okay";
+	pinctrl-0 = <&spi3_default>;
+	pinctrl-1 = <&spi3_sleep>;
+	pinctrl-names = "default", "sleep";
+
+	led_strip: ws2812@0 {
+		compatible = "worldsemi,ws2812-spi";
+		reg = <0>;
+		// SPI bit clock — 4 MHz keeps the 0/1 frame timings within the
+		// WS2812 spec (~1.25 µs per pixel bit).
+		spi-max-frequency = <4000000>;
+		// Adjust to match your strip length. The driver allocates a
+		// per-LED buffer at boot so over-sizing wastes RAM.
+		chain-length = <10>;
+		spi-one-frame = <0x70>;
+		spi-zero-frame = <0x40>;
+		color-mapping = <LED_COLOR_ID_GREEN LED_COLOR_ID_RED LED_COLOR_ID_BLUE>;
 	};
 };

@@ -3,91 +3,81 @@
 #include <dt-bindings/zmk/bt.h>
 #include <dt-bindings/zmk/outputs.h>
 #include <dt-bindings/zmk/pointing.h>
+#include <dt-bindings/zmk/rgb.h>
+#include <dt-bindings/zmk/backlight.h>
 
-// 4×3 matrix on nrf52840-DK. Each layer exercises a different group of
-// behaviors from https://zmk.dev/docs/keymaps/behaviors. Switching:
+// 4 onboard buttons. Position order = input-gpios order in the overlay:
+//   pos0 = BTN1 (P0.11)
+//   pos1 = BTN2 (P0.12)
+//   pos2 = BTN3 (P0.24)
+//   pos3 = BTN4 (P0.25)
 //
-//   L0 → L1  : hold middle thumb (&lt 1 SPACE) for BT / Output testing
-//   L0 → L2  : tap &sl 2 then any key (sticky-layer demo)
-//   L0 → L3  : hold bottom-right (&mo 3) for mouse / system testing
-//   any → L0 : &to 0 on each non-base layer
+// BTN4 always advances to the next layer. BTN1-3 carry the actual
+// behaviors under test for that layer. After L8 it wraps back to L0.
 //
-// Skipped (need hardware the DK doesn't have):
-//   &rgb_ug  — wire a WS2812 strip + CONFIG_ZMK_RGB_UNDERGLOW=y
-//   &bl      — needs PWM-driven LED + CONFIG_ZMK_BACKLIGHT=y
-//   &ext_power — needs zmk,ext-power node tied to a power-switch GPIO
+// To peek at L2's "layer" behaviors (mo/tog/sl) you cycle to L2 first
+// — when you tap mo/tog/sl while ON L2 they affect L7 ("destination"
+// layer) so you can verify the behavior actually warps state.
 
 / {
     keymap {
         compatible = "zmk,keymap";
 
-        // ─── L0 base: hold-tap, sticky, modifiers, layer switches ───
-        // |  Q          |  W          |  E         |
-        // |  MT(SFT,A)  |  LT(1,SPC)  |  MT(CTL,D) |
-        // |  SK(SHIFT)  |  SL(2)      |  KT(CAPS)  |
-        // |  CAPS_WORD  |  GRESC      |  MO(3)     |
-        default_layer {
-            bindings = <
-                &kp Q          &kp W              &kp E
-                &mt LSHFT A    &lt 1 SPACE        &mt LCTRL D
-                &sk LSHFT      &sl 2              &kt CAPSLOCK
-                &caps_word     &gresc             &mo 3
-            >;
+        // ─── L0 basic key-press ───
+        // BTN1 A   BTN2 B   BTN3 C   BTN4 →L1
+        l0_basic {
+            bindings = <&kp A &kp B &kp C &to 1>;
         };
 
-        // ─── L1 bluetooth + output selection ───
-        // |  BT_SEL 0  |  BT_SEL 1  |  BT_SEL 2  |
-        // |  BT_NXT    |  BT_PRV    |  BT_CLR    |
-        // |  BT_CLR_ALL|  OUT_USB   |  OUT_BLE   |
-        // |  OUT_TOG   |  TOG(2)    |  TO(0)     |
-        bt_layer {
-            bindings = <
-                &bt BT_SEL 0   &bt BT_SEL 1       &bt BT_SEL 2
-                &bt BT_NXT     &bt BT_PRV         &bt BT_CLR
-                &bt BT_CLR_ALL &out OUT_USB       &out OUT_BLE
-                &out OUT_TOG   &tog 2             &to 0
-            >;
+        // ─── L1 hold-tap + sticky-key ───
+        // BTN1 MT(SFT,A)   BTN2 LT(7,SPC)   BTN3 SK(SFT)   BTN4 →L2
+        l1_holdtap {
+            bindings = <&mt LSHFT A &lt 7 SPACE &sk LSHFT &to 2>;
         };
 
-        // ─── L2 sticky-layer landing pad: numbers + key_repeat + none ───
-        // |  1 |  2 |  3 |
-        // |  4 |  5 |  6 |
-        // |  7 |  8 |  9 |
-        // |  0 | KEY_REPEAT | TO(0) |
-        nums_layer {
-            bindings = <
-                &kp N1         &kp N2             &kp N3
-                &kp N4         &kp N5             &kp N6
-                &kp N7         &kp N8             &kp N9
-                &kp N0         &key_repeat        &to 0
-            >;
+        // ─── L2 layer behaviors (target = L7 so you see something) ───
+        // BTN1 MO(7)   BTN2 TOG(7)   BTN3 SL(7)   BTN4 →L3
+        l2_layer {
+            bindings = <&mo 7 &tog 7 &sl 7 &to 3>;
         };
 
-        // ─── L3 mouse + system + studio ───
-        // |  MB1       |  MMV_UP    |  MB2       |
-        // |  MMV_LEFT  |  MMV_DOWN  |  MMV_RIGHT |
-        // |  SCRL_UP   |  SCRL_DOWN |  SOFT_OFF  |
-        // |  STUDIO    |  SYS_RESET |  BOOTLOAD  |
-        sys_layer {
-            bindings = <
-                &mkp MB1       &mmv MOVE_UP       &mkp MB2
-                &mmv MOVE_LEFT &mmv MOVE_DOWN     &mmv MOVE_RIGHT
-                &msc SCRL_UP   &msc SCRL_DOWN     &soft_off
-                &studio_unlock &sys_reset         &bootloader
-            >;
+        // ─── L3 key-toggle / caps-word / key-repeat ───
+        // BTN1 KT(CAPS)   BTN2 CAPS_WORD   BTN3 KEY_REPEAT   BTN4 →L4
+        l3_keys {
+            bindings = <&kt CAPSLOCK &caps_word &key_repeat &to 4>;
         };
 
-        // ─── L4 reserved (currently unreachable) ───
-        // Holds &none + &trans demo so the ZMK build resolves both
-        // bindings even though the layer never activates. Useful as a
-        // copy-paste reference. Triggerable by adding &tog 4 to L0.
-        spare_layer {
-            bindings = <
-                &trans         &none              &trans
-                &none          &trans             &none
-                &trans         &none              &trans
-                &none          &trans             &to 0
-            >;
+        // ─── L4 misc — gresc / trans / none ───
+        // BTN1 GRESC   BTN2 TRANS   BTN3 NONE   BTN4 →L5
+        // (TRANS falls through to L0's mapping = &kp B.)
+        // (NONE = nothing, the test is "no HID report").
+        l4_misc {
+            bindings = <&gresc &trans &none &to 5>;
+        };
+
+        // ─── L5 bluetooth / output ───
+        // BTN1 BT_NXT   BTN2 BT_CLR   BTN3 OUT_TOG   BTN4 →L6
+        l5_bt_out {
+            bindings = <&bt BT_NXT &bt BT_CLR &out OUT_TOG &to 6>;
+        };
+
+        // ─── L6 mouse — button / move / scroll ───
+        // BTN1 MB1   BTN2 MMV_RIGHT   BTN3 MSC_DOWN   BTN4 →L7
+        l6_mouse {
+            bindings = <&mkp MB1 &mmv MOVE_RIGHT &msc SCRL_DOWN &to 7>;
+        };
+
+        // ─── L7 RGB / backlight / studio ───
+        // BTN1 RGB_TOG   BTN2 BL_TOG   BTN3 STUDIO_UNLOCK   BTN4 →L8
+        l7_rgb_bl {
+            bindings = <&rgb_ug RGB_TOG &bl BL_TOG &studio_unlock &to 8>;
+        };
+
+        // ─── L8 system reset / bootloader / soft-off ───
+        // BTN1 SYS_RESET   BTN2 BOOTLOADER   BTN3 SOFT_OFF   BTN4 →L0
+        // SOFT_OFF powers down — press the DK RESET button to wake.
+        l8_system {
+            bindings = <&sys_reset &bootloader &soft_off &to 0>;
         };
     };
 };
