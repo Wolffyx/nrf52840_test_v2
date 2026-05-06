@@ -23,13 +23,11 @@
 		buttons {
 			kscan = <&kscan_direct>;
 			row-offset = <0>;
-			column-offset = <0>;
 		};
 
 		matrix {
 			kscan = <&kscan_matrix>;
 			row-offset = <1>;
-			column-offset = <0>;
 		};
 	};
 
