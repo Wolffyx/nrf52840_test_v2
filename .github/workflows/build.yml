@@ -19,12 +19,15 @@ jobs:
         env:
           cache-name: cache-zephyr-modules
         with:
+          # west init -l config/config places the workspace topdir
+          # at config/, so .west and the fetched modules live there.
           path: |
-            modules/
-            tools/
-            zephyr/
-            bootloader/
-            zmk/
+            config/.west/
+            config/modules/
+            config/tools/
+            config/zephyr/
+            config/bootloader/
+            config/zmk/
           key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('config/config/west.yml') }}
           restore-keys: |
             ${{ runner.os }}-build-${{ env.cache-name }}-
@@ -32,19 +35,18 @@ jobs:
             ${{ runner.os }}-
 
       - name: West init
-        working-directory: ${{ github.workspace }}
         run: west init -l config/config
 
       - name: West update
-        working-directory: ${{ github.workspace }}
+        working-directory: config
         run: west update
 
       - name: West zephyr-export
-        working-directory: ${{ github.workspace }}
+        working-directory: config
         run: west zephyr-export
 
       - name: Build
-        working-directory: ${{ github.workspace }}
+        working-directory: config
         run: |
           west build -s zmk/app -b "nrf52840dk/nrf52840/zmk" -- \
             -DSHIELD=NRF52840_TEST \
@@ -55,19 +57,19 @@ jobs:
       # Build emits any of zephyr.{hex,bin,uf2} or zmk.{hex,bin,uf2}
       # depending on toolchain version — copy whichever exists.
       - name: Stage artifacts
-        working-directory: ${{ github.workspace }}
+        working-directory: config
         run: |
           set -eu
-          mkdir -p artifacts
+          mkdir -p ../artifacts
           base="nrf52840dk_nrf52840_zmk-NRF52840_TEST"
           for ext in hex bin uf2; do
             if [ -f "build/zephyr/zmk.${ext}" ]; then
-              cp "build/zephyr/zmk.${ext}" "artifacts/${base}-zmk.${ext}"
+              cp "build/zephyr/zmk.${ext}" "../artifacts/${base}-zmk.${ext}"
             elif [ -f "build/zephyr/zephyr.${ext}" ]; then
-              cp "build/zephyr/zephyr.${ext}" "artifacts/${base}-zmk.${ext}"
+              cp "build/zephyr/zephyr.${ext}" "../artifacts/${base}-zmk.${ext}"
             fi
           done
-          ls -lah artifacts/
+          ls -lah ../artifacts/
 
       - name: Upload firmware
         uses: actions/upload-artifact@v4
