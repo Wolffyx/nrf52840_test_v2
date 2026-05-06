@@ -18,5 +18,5 @@
 #
 ---
 include:
-  - board: nrf52840dk/nrf52840/zmk
+  - board: nrf52840dk_nrf52840
     shield: NRF52840_TEST
