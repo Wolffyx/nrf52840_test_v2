@@ -1,0 +1,93 @@
+#include <behaviors.dtsi>
+#include <dt-bindings/zmk/keys.h>
+#include <dt-bindings/zmk/bt.h>
+#include <dt-bindings/zmk/outputs.h>
+#include <dt-bindings/zmk/pointing.h>
+
+// 4×3 matrix on nrf52840-DK. Each layer exercises a different group of
+// behaviors from https://zmk.dev/docs/keymaps/behaviors. Switching:
+//
+//   L0 → L1  : hold middle thumb (&lt 1 SPACE) for BT / Output testing
+//   L0 → L2  : tap &sl 2 then any key (sticky-layer demo)
+//   L0 → L3  : hold bottom-right (&mo 3) for mouse / system testing
+//   any → L0 : &to 0 on each non-base layer
+//
+// Skipped (need hardware the DK doesn't have):
+//   &rgb_ug  — wire a WS2812 strip + CONFIG_ZMK_RGB_UNDERGLOW=y
+//   &bl      — needs PWM-driven LED + CONFIG_ZMK_BACKLIGHT=y
+//   &ext_power — needs zmk,ext-power node tied to a power-switch GPIO
+
+/ {
+    keymap {
+        compatible = "zmk,keymap";
+
+        // ─── L0 base: hold-tap, sticky, modifiers, layer switches ───
+        // |  Q          |  W          |  E         |
+        // |  MT(SFT,A)  |  LT(1,SPC)  |  MT(CTL,D) |
+        // |  SK(SHIFT)  |  SL(2)      |  KT(CAPS)  |
+        // |  CAPS_WORD  |  GRESC      |  MO(3)     |
+        default_layer {
+            bindings = <
+                &kp Q          &kp W              &kp E
+                &mt LSHFT A    &lt 1 SPACE        &mt LCTRL D
+                &sk LSHFT      &sl 2              &kt CAPSLOCK
+                &caps_word     &gresc             &mo 3
+            >;
+        };
+
+        // ─── L1 bluetooth + output selection ───
+        // |  BT_SEL 0  |  BT_SEL 1  |  BT_SEL 2  |
+        // |  BT_NXT    |  BT_PRV    |  BT_CLR    |
+        // |  BT_CLR_ALL|  OUT_USB   |  OUT_BLE   |
+        // |  OUT_TOG   |  TOG(2)    |  TO(0)     |
+        bt_layer {
+            bindings = <
+                &bt BT_SEL 0   &bt BT_SEL 1       &bt BT_SEL 2
+                &bt BT_NXT     &bt BT_PRV         &bt BT_CLR
+                &bt BT_CLR_ALL &out OUT_USB       &out OUT_BLE
+                &out OUT_TOG   &tog 2             &to 0
+            >;
+        };
+
+        // ─── L2 sticky-layer landing pad: numbers + key_repeat + none ───
+        // |  1 |  2 |  3 |
+        // |  4 |  5 |  6 |
+        // |  7 |  8 |  9 |
+        // |  0 | KEY_REPEAT | TO(0) |
+        nums_layer {
+            bindings = <
+                &kp N1         &kp N2             &kp N3
+                &kp N4         &kp N5             &kp N6
+                &kp N7         &kp N8             &kp N9
+                &kp N0         &key_repeat        &to 0
+            >;
+        };
+
+        // ─── L3 mouse + system + studio ───
+        // |  MB1       |  MMV_UP    |  MB2       |
+        // |  MMV_LEFT  |  MMV_DOWN  |  MMV_RIGHT |
+        // |  SCRL_UP   |  SCRL_DOWN |  SOFT_OFF  |
+        // |  STUDIO    |  SYS_RESET |  BOOTLOAD  |
+        sys_layer {
+            bindings = <
+                &mkp MB1       &mmv MOVE_UP       &mkp MB2
+                &mmv MOVE_LEFT &mmv MOVE_DOWN     &mmv MOVE_RIGHT
+                &msc SCRL_UP   &msc SCRL_DOWN     &soft_off
+                &studio_unlock &sys_reset         &bootloader
+            >;
+        };
+
+        // ─── L4 reserved (currently unreachable) ───
+        // Holds &none + &trans demo so the ZMK build resolves both
+        // bindings even though the layer never activates. Useful as a
+        // copy-paste reference. Triggerable by adding &tog 4 to L0.
+        spare_layer {
+            bindings = <
+                &trans         &none              &trans
+                &none          &trans             &none
+                &trans         &none              &trans
+                &none          &trans             &to 0
+            >;
+        };
+    };
+};

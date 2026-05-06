@@ -1,0 +1,41 @@
+#include <dt-bindings/zmk/matrix_transform.h>
+
+/ {
+	chosen {
+		zmk,kscan = &kscan;
+		zmk,matrix_transform = &transform;
+	};
+
+	transform: transform {
+		compatible = "zmk,matrix-transform";
+		columns = <3>;
+		rows = <4>;
+		map = <
+			RC(0, 0) RC(0, 1) RC(0, 2)
+			RC(1, 0) RC(1, 1) RC(1, 2)
+			RC(2, 0) RC(2, 1) RC(2, 2)
+			RC(3, 0) RC(3, 1) RC(3, 2)
+		>;
+	};
+
+	// nrf52840-DK Arduino-header pins. Avoids onboard LEDs (P0.13-16) and
+	// buttons (P0.11/12/24/25). Wire row pins to one side of each switch,
+	// col pins to the other side; diodes point col→row (col2row).
+	//   Rows: D2=P1.03, D3=P1.04, D4=P1.05, D5=P1.06
+	//   Cols: D6=P1.07, D7=P1.08, D8=P1.10
+	kscan: kscan {
+		compatible = "zmk,kscan-gpio-matrix";
+		diode-direction = "col2row";
+		row-gpios
+			= <&gpio1 3 (GPIO_ACTIVE_HIGH | GPIO_PULL_DOWN)>
+			, <&gpio1 4 (GPIO_ACTIVE_HIGH | GPIO_PULL_DOWN)>
+			, <&gpio1 5 (GPIO_ACTIVE_HIGH | GPIO_PULL_DOWN)>
+			, <&gpio1 6 (GPIO_ACTIVE_HIGH | GPIO_PULL_DOWN)>
+			;
+		col-gpios
+			= <&gpio1 7 GPIO_ACTIVE_HIGH>
+			, <&gpio1 8 GPIO_ACTIVE_HIGH>
+			, <&gpio1 10 GPIO_ACTIVE_HIGH>
+			;
+	};
+};

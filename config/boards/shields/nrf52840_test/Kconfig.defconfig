@@ -1,0 +1,6 @@
+if SHIELD_NRF52840_TEST
+
+config ZMK_KEYBOARD_NAME
+	default "nRF52840-DK Test"
+
+endif # SHIELD_NRF52840_TEST
