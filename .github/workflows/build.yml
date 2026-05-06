@@ -9,13 +9,11 @@ jobs:
       image: zmkfirmware/zmk-build-arm:stable
     name: Build NRF52840_TEST on nrf52840dk/nrf52840/zmk
     steps:
-      # Check out into a subdir, NOT into ${GITHUB_WORKSPACE} root —
-      # the workspace root becomes west's topdir and must stay free of
-      # the user repo's own zephyr/module.yml to avoid Kconfig recursion.
+      # Checkout into ${GITHUB_WORKSPACE} root — this matches the upstream
+      # zmk-config-template layout where the manifest dir (config/) is a
+      # direct child of the workspace topdir.
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          path: user_config
 
       - name: Cache west modules
         uses: actions/cache@v4
@@ -23,20 +21,19 @@ jobs:
           cache-name: cache-zephyr-modules
         with:
           path: |
-            .west/
             modules/
             tools/
             zephyr/
             bootloader/
             zmk/
-          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('user_config/config/west.yml') }}
+          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('config/west.yml') }}
           restore-keys: |
             ${{ runner.os }}-build-${{ env.cache-name }}-
             ${{ runner.os }}-build-
             ${{ runner.os }}-
 
       - name: West init
-        run: west init -l user_config/config
+        run: west init -l config
 
       - name: West update
         run: west update
@@ -48,8 +45,7 @@ jobs:
         run: |
           west build -s zmk/app -b "nrf52840dk/nrf52840/zmk" -- \
             -DSHIELD=NRF52840_TEST \
-            -DZMK_CONFIG="${GITHUB_WORKSPACE}/user_config/config" \
-            -DZMK_EXTRA_MODULES="${GITHUB_WORKSPACE}/user_config"
+            -DZMK_CONFIG="${GITHUB_WORKSPACE}/config"
 
       # Stage every produced firmware format. Build emits any of
       # zephyr.{hex,bin,uf2} or zmk.{hex,bin,uf2} depending on the
