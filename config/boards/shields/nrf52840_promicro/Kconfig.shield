@@ -1,0 +1,2 @@
+config SHIELD_NRF52840_PROMICRO
+    def_bool $(shields_list_contains, NRF52840_PROMICRO)

@@ -1,0 +1,182 @@
+#include <dt-bindings/zmk/matrix_transform.h>
+#include <physical_layouts.dtsi>
+#include <zephyr/dt-bindings/led/led.h>
+
+/*
+ * Pro Micro nRF52840 (promicro_nrf52840) wiring for the behavior-coverage
+ * test. Unlike the nrf52840-DK shield there are NO onboard buttons and no
+ * Arduino header, so every key is wired to a broken-out Pro Micro pad. The
+ * board exposes raw nRF GPIOs (there is no `pro_micro` nexus), so pins are
+ * referenced as &gpio0 / &gpio1 directly.
+ *
+ * These are BENCH-TEST DEFAULTS — sensible free pins that avoid the board's
+ * UART (P0.09/P0.10), I2C (P1.00/P0.11, P1.04/P1.06), SPI2 (P1.01/P1.02/P1.07)
+ * and onboard LED (P0.15). Re-map to match however you actually wire the
+ * board; the keymap positions (0-15) stay the same.
+ *
+ *   Direct keys (pos 0-3, momentary switch to GND):
+ *     pos 0 = P0.06   pos 1 = P0.08   pos 2 = P0.17   pos 3 = P0.20
+ *   4x3 matrix (col2row, 1N4148 per switch, cathode toward the row pin):
+ *     rows = P0.22, P0.24, P1.11, P1.13
+ *     cols = P0.02, P0.29, P0.31
+ */
+
+/ {
+	chosen {
+		zmk,physical-layout = &physical_layout_default;
+		zmk,backlight = &backlight_pwm;
+		zmk,underglow = &led_strip;
+		zmk,ext-power = &ext_power_ctrl;
+		// CDC ACM endpoint ZMK Studio's RPC transport binds to. Without
+		// this the firmware exposes only the HID keyboard interface and
+		// the host never enumerates a COM port for Studio.
+		zmk,studio-rpc-uart = &studio_acm;
+	};
+
+	// Stub ext-power "switch" pinned to a spare pad (P0.28). The Pro Micro
+	// has no real peripheral-power gate; this lets ZMK's RGB driver resolve
+	// its hard ext_power dependency at build time and lets the &ext_power
+	// EP_TOG / EP_ON / EP_OFF behaviors visibly toggle a pin.
+	// Label is `ext_power_ctrl` (not `ext_power`) because ZMK's
+	// behaviors.dtsi already labels its &ext_power *behavior* node with
+	// the bare `ext_power` symbol.
+	ext_power_ctrl: ext_power_ctrl {
+		compatible = "zmk,ext-power-generic";
+		control-gpios = <&gpio0 28 GPIO_ACTIVE_HIGH>;
+		init-delay-ms = <10>;
+	};
+
+	// Physical layout — 16 keys in two clusters (identical shape to the DK
+	// build): a 4u bar on top, then a 4x3 grid. Units are 1/100 of a key.
+	physical_layout_default: physical_layout_default {
+		compatible = "zmk,physical-layout";
+		display-name = "PM Test";
+		kscan = <&kscan>;
+		transform = <&transform>;
+		keys
+			//                     w   h    x    y rot rx ry
+			= <&key_physical_attrs 100 100    0    0   0  0  0>
+			, <&key_physical_attrs 100 100  100    0   0  0  0>
+			, <&key_physical_attrs 100 100  200    0   0  0  0>
+			, <&key_physical_attrs 100 100  300    0   0  0  0>
+			, <&key_physical_attrs 100 100    0  200   0  0  0>
+			, <&key_physical_attrs 100 100  100  200   0  0  0>
+			, <&key_physical_attrs 100 100  200  200   0  0  0>
+			, <&key_physical_attrs 100 100    0  300   0  0  0>
+			, <&key_physical_attrs 100 100  100  300   0  0  0>
+			, <&key_physical_attrs 100 100  200  300   0  0  0>
+			, <&key_physical_attrs 100 100    0  400   0  0  0>
+			, <&key_physical_attrs 100 100  100  400   0  0  0>
+			, <&key_physical_attrs 100 100  200  400   0  0  0>
+			, <&key_physical_attrs 100 100    0  500   0  0  0>
+			, <&key_physical_attrs 100 100  100  500   0  0  0>
+			, <&key_physical_attrs 100 100  200  500   0  0  0>
+			;
+	};
+
+	// Composite kscan stitches the 4 direct keys (direct kscan) and a 4x3
+	// matrix into a single virtual 5x4 grid:
+	//   row 0     = direct keys (cols 0-3)
+	//   rows 1..4 = matrix (cols 0-2)
+	// The matrix_transform below flattens that grid into 16 keymap
+	// positions: 0-3 = direct, 4-15 = matrix in row-major order.
+	kscan: kscan_composite {
+		compatible = "zmk,kscan-composite";
+		rows = <5>;
+		columns = <4>;
+
+		buttons {
+			kscan = <&kscan_direct>;
+			row-offset = <0>;
+		};
+
+		matrix {
+			kscan = <&kscan_matrix>;
+			row-offset = <1>;
+		};
+	};
+
+	transform: transform {
+		compatible = "zmk,matrix-transform";
+		rows = <5>;
+		columns = <4>;
+		map = <
+			RC(0,0) RC(0,1) RC(0,2) RC(0,3)
+			RC(1,0) RC(1,1) RC(1,2)
+			RC(2,0) RC(2,1) RC(2,2)
+			RC(3,0) RC(3,1) RC(3,2)
+			RC(4,0) RC(4,1) RC(4,2)
+		>;
+	};
+
+	// Direct kscan on four broken-out pads. Switches are active-low (one
+	// side to GND, the other to the pin) so use ACTIVE_LOW + internal pull-up.
+	kscan_direct: kscan_direct {
+		compatible = "zmk,kscan-gpio-direct";
+		input-gpios
+			= <&gpio0 6 (GPIO_ACTIVE_LOW | GPIO_PULL_UP)>
+			, <&gpio0 8 (GPIO_ACTIVE_LOW | GPIO_PULL_UP)>
+			, <&gpio0 17 (GPIO_ACTIVE_LOW | GPIO_PULL_UP)>
+			, <&gpio0 20 (GPIO_ACTIVE_LOW | GPIO_PULL_UP)>
+			;
+	};
+
+	// 4x3 matrix on broken-out pads. Wire each switch row-to-col with a
+	// 1N4148 diode; cathode (band) toward the row pin (col2row).
+	kscan_matrix: kscan_matrix {
+		compatible = "zmk,kscan-gpio-matrix";
+		diode-direction = "col2row";
+		row-gpios
+			= <&gpio0 22 (GPIO_ACTIVE_HIGH | GPIO_PULL_DOWN)>
+			, <&gpio0 24 (GPIO_ACTIVE_HIGH | GPIO_PULL_DOWN)>
+			, <&gpio1 11 (GPIO_ACTIVE_HIGH | GPIO_PULL_DOWN)>
+			, <&gpio1 13 (GPIO_ACTIVE_HIGH | GPIO_PULL_DOWN)>
+			;
+		col-gpios
+			= <&gpio0 2 GPIO_ACTIVE_HIGH>
+			, <&gpio0 29 GPIO_ACTIVE_HIGH>
+			, <&gpio0 31 GPIO_ACTIVE_HIGH>
+			;
+	};
+
+	// Backlight = onboard LED (P0.15) driven through PWM0 channel 0. The
+	// board's pwm0 pinctrl already routes channel 0 to P0.15, so no pinctrl
+	// override is needed here (unlike the DK). The LED is active-low, so
+	// polarity is inverted — "0%" leaves it off, "100%" lights it.
+	backlight_pwm: backlight_pwm {
+		compatible = "pwm-leds";
+		bl_led_0: bl_led_0 {
+			pwms = <&pwm0 0 PWM_MSEC(10) PWM_POLARITY_INVERTED>;
+		};
+	};
+};
+
+// WS2812 underglow on the board's SPI2 MOSI (P1.02). SPI2 is already enabled
+// and pin-mapped by the board; we only add the strip child. (SPI2 is a legacy
+// nordic,nrf-spi controller without EasyDMA — fine to build and drive a short
+// strip for a bench test; a production board would prefer a nordic,nrf-spim
+// bus for tighter WS2812 timing.)
+&spi2 {
+	led_strip: ws2812@0 {
+		compatible = "worldsemi,ws2812-spi";
+		reg = <0>;
+		// SPI bit clock — 4 MHz keeps the 0/1 frame timings within the
+		// WS2812 spec (~1.25 us per pixel bit).
+		spi-max-frequency = <4000000>;
+		// Adjust to match your strip length. The driver allocates a
+		// per-LED buffer at boot so over-sizing wastes RAM.
+		chain-length = <10>;
+		spi-one-frame = <0x70>;
+		spi-zero-frame = <0x40>;
+		color-mapping = <LED_COLOR_ID_GREEN LED_COLOR_ID_RED LED_COLOR_ID_BLUE>;
+	};
+};
+
+// CDC ACM USB function for ZMK Studio RPC transport. Lives on the board's USB
+// device controller. The chosen `zmk,studio-rpc-uart` above wires Studio's
+// UART RPC layer to this endpoint, which the host sees as a USB serial port.
+&zephyr_udc0 {
+	studio_acm: studio_acm {
+		compatible = "zephyr,cdc-acm-uart";
+	};
+};
