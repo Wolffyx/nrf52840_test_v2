@@ -6,7 +6,7 @@ jobs:
   # ZMK's official reusable config-build workflow. It reads build.yaml, builds
   # every board+shield combination listed there, and uploads a single
   # `firmware` artifact containing each target's zmk.{uf2,hex,bin}.
-  #   - promicro_nrf52840/nrf52840/uf2  → emits a .uf2 (Adafruit UF2 bootloader)
+  #   - promicro_nrf52840/nrf52840/zmk  → emits a .uf2 (Adafruit UF2 bootloader)
   #   - nrf52840dk/nrf52840/zmk         → emits .hex/.bin (bare DK, no UF2 loader)
   build:
     uses: zmkfirmware/zmk/.github/workflows/build-user-config.yml@main
