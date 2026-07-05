@@ -2,11 +2,86 @@ name: Build
 
 on: [push, pull_request, workflow_dispatch]
 
+# Custom matrix build (not ZMK's reusable build-user-config workflow). The
+# reusable one hard-fails on a "board without explicit ZMK compat" guard, and
+# promicro_nrf52840 is a bare Zephyr board (it compiles fine under ZMK but has
+# no `zmk` board variant and doesn't set CONFIG_ZMK_BOARD_COMPAT). This custom
+# job builds each board+shield directly and stages every firmware format,
+# including the .uf2 the Pro Micro's Adafruit bootloader needs.
 jobs:
-  # ZMK's official reusable config-build workflow. It reads build.yaml, builds
-  # every board+shield combination listed there, and uploads a single
-  # `firmware` artifact containing each target's zmk.{uf2,hex,bin}.
-  #   - promicro_nrf52840/nrf52840/zmk  → emits a .uf2 (Adafruit UF2 bootloader)
-  #   - nrf52840dk/nrf52840/zmk         → emits .hex/.bin (bare DK, no UF2 loader)
   build:
-    uses: zmkfirmware/zmk/.github/workflows/build-user-config.yml@main
+    runs-on: ubuntu-latest
+    container:
+      image: zmkfirmware/zmk-build-arm:stable
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - board: nrf52840dk/nrf52840/zmk
+            shield: NRF52840_TEST
+            artifact: nrf52840dk_nrf52840_zmk-NRF52840_TEST
+          - board: promicro_nrf52840/nrf52840/uf2
+            shield: NRF52840_PROMICRO
+            artifact: promicro_nrf52840-NRF52840_PROMICRO
+    name: Build ${{ matrix.shield }} (${{ matrix.board }})
+    steps:
+      # Checkout into ${GITHUB_WORKSPACE} root — matches the upstream
+      # zmk-config-template layout where the manifest dir (config/) is a
+      # direct child of the workspace topdir.
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Cache west modules
+        uses: actions/cache@v4
+        env:
+          cache-name: cache-zephyr-modules
+        with:
+          path: |
+            modules/
+            tools/
+            zephyr/
+            bootloader/
+            zmk/
+          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('config/west.yml') }}
+          restore-keys: |
+            ${{ runner.os }}-build-${{ env.cache-name }}-
+            ${{ runner.os }}-build-
+            ${{ runner.os }}-
+
+      - name: West init
+        run: west init -l config
+
+      - name: West update
+        run: west update
+
+      - name: West zephyr-export
+        run: west zephyr-export
+
+      - name: Build
+        run: |
+          west build -s zmk/app -b "${{ matrix.board }}" -- \
+            -DSHIELD=${{ matrix.shield }} \
+            -DZMK_CONFIG="${GITHUB_WORKSPACE}/config"
+
+      # Stage every produced firmware format. Build emits any of
+      # zephyr.{hex,bin,uf2} or zmk.{hex,bin,uf2} depending on the
+      # toolchain/board — copy whichever exists.
+      - name: Stage artifacts
+        run: |
+          set -eu
+          mkdir -p artifacts
+          for ext in hex bin uf2; do
+            if [ -f "build/zephyr/zmk.${ext}" ]; then
+              cp "build/zephyr/zmk.${ext}" "artifacts/${{ matrix.artifact }}.${ext}"
+            elif [ -f "build/zephyr/zephyr.${ext}" ]; then
+              cp "build/zephyr/zephyr.${ext}" "artifacts/${{ matrix.artifact }}.${ext}"
+            fi
+          done
+          ls -lah artifacts/
+
+      - name: Upload firmware
+        uses: actions/upload-artifact@v4
+        with:
+          name: firmware-${{ matrix.artifact }}
+          path: artifacts/*
+          if-no-files-found: error

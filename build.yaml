@@ -20,5 +20,5 @@
 include:
   - board: nrf52840dk/nrf52840/zmk
     shield: NRF52840_TEST
-  - board: promicro_nrf52840/nrf52840/zmk
+  - board: promicro_nrf52840/nrf52840/uf2
     shield: NRF52840_PROMICRO
