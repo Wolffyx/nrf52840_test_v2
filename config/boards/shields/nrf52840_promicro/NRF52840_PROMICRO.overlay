@@ -180,3 +180,12 @@
 		compatible = "zephyr,cdc-acm-uart";
 	};
 };
+
+// The promicro_nrf52840 board DTS includes zephyr's cdc_acm_serial.dtsi, which
+// adds its own console CDC ACM (board_cdc_acm_uart). With studio_acm above the
+// board then enumerates TWO identically-named USB serial ports — host pickers
+// show duplicate "PM Test" entries and only studio_acm speaks RPC. No console
+// is wired in this build (logging off), so disable the board's node outright.
+&board_cdc_acm_uart {
+	status = "disabled";
+};
